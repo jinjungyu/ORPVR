@@ -4,7 +4,7 @@ import os
 from shutil import copy
 import numpy as np
 
-from mmdet.apis import inference_detector,init_detector
+from mmdetection.mmdet.apis import inference_detector,init_detector
 
 white = np.array([255,255,255])
 target = 0 # Person
@@ -21,13 +21,13 @@ def parsing():
 
 def main(args):
     # 소스는 rawdataset 아래에 있다고 간주
-
+    
     if not os.path.exists('dataset'):
         os.mkdir('dataset')
 
     # Mask2former config
-    args.config = 'configs/mask2former/mask2former_swin-s-p4-w7-224_lsj_8x2_50e_coco.py'
-    args.checkpoint = 'checkpoints/mask2former_swin-s-p4-w7-224_lsj_8x2_50e_coco_20220504_001756-743b7d99.pth'
+    args.config = 'mmdetection/configs/mask2former/mask2former_swin-s-p4-w7-224_lsj_8x2_50e_coco.py'
+    args.checkpoint = 'mmdetection/checkpoints/mask2former_swin-s-p4-w7-224_lsj_8x2_50e_coco_20220504_001756-743b7d99.pth'
 
     model = init_detector(args.config, args.checkpoint, device=args.device)
 
