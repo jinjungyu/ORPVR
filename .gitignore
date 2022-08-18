@@ -4,5 +4,5 @@
 !install.sh
 !setup_data.py
 !rawdataset
-!mask2former
-mask2former/mask2former_swin-s-p4-w7-224_lsj_8x2_50e_coco_20220504_001756-743b7d99.pth
+rawdataset/*
+!rawdataset/man.jpg
