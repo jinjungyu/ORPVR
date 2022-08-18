@@ -40,13 +40,14 @@ def main(args):
         os.makedirs(args.maskdir,exist_ok=True)
 
         args.src = os.path.join('rawdataset',args.src)
-        args.img = []
+        args.cnt = 1
 
         dir,_,files = next(iter(os.walk(args.src)))
         for file in sorted(files):
             filepath = os.path.join(dir,file)
             result = inference_detector(model,filepath)
             masking(args,filepath,result)
+            args.cnt += 1
     else:
         # args.src = man.jpg or street/man.jpg
         if args.src.endswith(('.jpg','.png')):
@@ -55,6 +56,7 @@ def main(args):
             args.maskdir = os.path.join('dataset','single','masks')
             os.makedirs(args.imgdir,exist_ok=True)
             os.makedirs(args.maskdir,exist_ok=True)
+            args.cnt = None
             result = inference_detector(model, filepath)
             masking(args,filepath,result)
         else:
@@ -63,9 +65,13 @@ def main(args):
 
 def masking(args,filepath,result):
     imgname = os.path.basename(filepath)
-    fname,ext = imgname.split('.')
+    if args.cnt:
+        ext = imgname.split('.')[-1]
+        fname = f'img{args.cnt:>04}'
+    else:
+        fname,ext = imgname.split('.')
 
-    copy(filepath,os.path.join(args.imgdir,imgname))
+    copy(filepath,os.path.join(args.imgdir,f'{fname}.{ext}'))
 
     maskdir = os.path.join(args.maskdir,fname)
     os.makedirs(maskdir,exist_ok=True)
@@ -89,8 +95,8 @@ def masking(args,filepath,result):
                     img[i][j] = white
                 else:
                     img[i][j] = black
-        img = Image.fromarray(img)
-        img.save(os.path.join(maskdir,f'mask{n:>03}.{ext}'))
+        newmask = Image.fromarray(img)
+        newmask.save(os.path.join(maskdir,f'mask{n:>03}.{ext}'))
         n += 1
 
 if __name__ == "__main__":
