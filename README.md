@@ -1,32 +1,24 @@
 # Video Resolution Conversion - Using Instance Segmentation  
 
-## How to Use  
-0. clone repository  
-```
-git clone https://github.com/realJun9u/Vid_Conversion.git
-```
-1. Create Virtual Environment and Install MMDetection  
-This project is dependent on the mmdetection project.  
-You can choose whether to create a virtual environment and install Pytorch or proceed with the current environment.  
-
-* Directory Structure  
-.  
-├── README.md  
-├── dataset  
-├── mmdetection - will be installed  
-├── rawdataset  
-├── setup_conda.sh  
-└── setup_data.py  
-
+## Prerequisites (selection)
+**Step 1.** Create Virtual Environment  
+step
 ```bash
-bash setup_conda.sh
-conda activate env_vid
+conda create --name $ENVNAME python=3.8 -y
+conda activate $ENVNAME
 ```
-
-2. Masking Rawdataset  
+**Step 2.** Install Pytorch Following [Instructions](https://pytorch.org/get-started/locally/)
+```bash
+conda install pytorch torchvision torchaudio cudatoolkit=$CUDAVERSION -c pytorch -y
+```
+## Installation and Use  
+**Step 1.** Install MMDetection
+```bash
+bash install.sh
+```  
+**Step 2.** Masking Rawdataset  
 You can use a directory containing images or a single image as an input.  
-* The file path is always considered to be under rawdataset.  
-
+The file path is always considered to be under rawdataset.  
 ```bash
 # Directory
 python setup_data.py REDS_640x480/$scene#

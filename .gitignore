@@ -1,7 +1,7 @@
 /*
 !.gitignore
 !README.md
-!setup_conda.sh
+!install.sh
 !setup_data.py
 !rawdataset
 !mask2former
