@@ -3,6 +3,3 @@
 !README.md
 !install.sh
 !setup_data.py
-!rawdataset
-rawdataset/*
-!rawdataset/man.jpg
