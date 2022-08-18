@@ -21,7 +21,9 @@ You can use a directory containing images or a single image as an input.
 The file path is always considered to be under rawdataset.  
 ```bash
 # Directory
-python setup_data.py REDS_640x480/$scene#
+python setup_data.py $video/$scene#
+```
+```bash
 # Single image
 python setup_data.py man.jpg
 ``` 
