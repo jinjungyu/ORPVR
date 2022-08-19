@@ -13,6 +13,7 @@ black = np.array([0,0,0])
 def parsing():
     parser = ArgumentParser()
     parser.add_argument('src', help='Image file or Directory')
+    parser.add_argument('--sep', action='store_true')
     parser.add_argument('--device', default='cuda:0', help='Device used for inference')
     parser.add_argument('--score-thr', type=float, default=0.3, help='bbox score threshold')
     parser.add_argument('--area-thr', type=float, default=0.1, help='bbox score threshold')
@@ -21,9 +22,12 @@ def parsing():
 
 def main(args):
     # 소스는 rawdataset 아래에 있다고 간주
-    
-    if not os.path.exists('dataset'):
-        os.mkdir('dataset')
+    if args.sep:
+        datadir = './dataset2'
+    else:
+        datadir = './dataset'
+    if not os.path.exists(datadir):
+        os.mkdir(datadir)
 
     # Mask2former config
     args.config = 'mmdetection/configs/mask2former/mask2former_swin-s-p4-w7-224_lsj_8x2_50e_coco.py'
@@ -34,8 +38,8 @@ def main(args):
     # 입력이 directory
     # args.src = REDS_640x480/12
     if os.path.isdir(os.path.join('rawdataset',args.src)):
-        args.imgdir = os.path.join('dataset',args.src,'images')
-        args.maskdir = os.path.join('dataset',args.src,'masks')
+        args.imgdir = os.path.join(datadir,args.src,'images')
+        args.maskdir = os.path.join(datadir,args.src,'masks')
         os.makedirs(args.imgdir,exist_ok=True)
         os.makedirs(args.maskdir,exist_ok=True)
 
@@ -52,8 +56,8 @@ def main(args):
         # args.src = man.jpg or street/man.jpg
         if args.src.endswith(('.jpg','.png')):
             filepath = os.path.join('rawdataset',args.src)
-            args.imgdir = os.path.join('dataset','single','images')
-            args.maskdir = os.path.join('dataset','single','masks')
+            args.imgdir = os.path.join(datadir,'single','images')
+            args.maskdir = os.path.join(datadir,'single','masks')
             os.makedirs(args.imgdir,exist_ok=True)
             os.makedirs(args.maskdir,exist_ok=True)
             args.cnt = None
@@ -63,7 +67,7 @@ def main(args):
             print("Input is neither Image file(jpg, png) nor Directory")
             return
 
-def masking(args,filepath,result):
+def masking_sep(args,filepath,result):
     imgname = os.path.basename(filepath)
     if args.cnt:
         ext = imgname.split('.')[-1]
@@ -95,9 +99,46 @@ def masking(args,filepath,result):
                     img[i][j] = white
                 else:
                     img[i][j] = black
-        newmask = Image.fromarray(img)
-        newmask.save(os.path.join(maskdir,f'mask{n:>03}.{ext}'))
+        img_mask = Image.fromarray(img)
+        img_mask.save(os.path.join(maskdir,f'mask{n:>03}.{ext}'))
         n += 1
+
+def masking(args,filepath,result):
+    imgname = os.path.basename(filepath)
+    if args.cnt:
+        ext = imgname.split('.')[-1]
+        fname = f'img{args.cnt:>04}'
+        maskname = f'mask{args.cnt:>04}'
+    else:
+        fname,ext = imgname.split('.')
+        maskname = fname
+
+    copy(filepath,os.path.join(args.imgdir,f'{fname}.{ext}'))
+    
+    img = Image.open(filepath)
+    img = np.array(img)
+
+    h,w = img.shape[:-1]
+    mask = np.zeros((h,w),dtype=np.bool_) # initial mask
+
+    for k in range(len(result[0][target])):
+        score = result[0][target][k][-1]
+        # threshold 보다 낮은 박스는 무시
+        if score < args.score_thr:
+            continue
+        # c1,r1,c2,r2 = map(int,result[0][target][k][:-1])
+        # 마스크들 겹치기
+        mask = np.bitwise_or(mask,result[1][target][k])
+
+    for i in range(h):
+        for j in range(w):
+            if mask[i][j]:
+                img[i][j] = white
+            else:
+                img[i][j] = black
+    img_mask = Image.fromarray(img)
+    img_mask.save(os.path.join(args.maskdir,f'{maskname}.{ext}'))
+
 
 if __name__ == "__main__":
     args = parsing()
