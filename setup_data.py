@@ -119,26 +119,31 @@ def masking(args,filepath,result):
     img = np.array(img)
 
     h,w = img.shape[:-1]
-    mask = np.zeros((h,w),dtype=np.bool_) # initial mask
-
+    size = h*w
+    mask = np.zeros((h,w),dtype=np.uint8)
+    coors = set()
     for k in range(len(result[0][target])):
         score = result[0][target][k][-1]
-        # threshold 보다 낮은 박스는 무시
+        # score threshold 보다 낮은 박스는 무시
         if score < args.score_thr:
             continue
-        # c1,r1,c2,r2 = map(int,result[0][target][k][:-1])
-        # 마스크들 겹치기
-        mask = np.bitwise_or(mask,result[1][target][k])
+        coor = set()
+        c1,r1,c2,r2 = map(int,result[0][target][k][:-1])
+        temp = result[1][target][k]
+        for i in range(r1,r2+1):
+            for j in range(c1,c2+1):
+                if temp[i][j]:
+                    coor.add((i,j))
+        # 객체 크기가 threshold 보다 크면 마스킹 포함
+        if len(coor) / size > args.area_thr:
+            coors.intersection_update(coor)
+        
+    # masking
+    for i,j in coors:
+        mask[i][j] = 255
 
-    for i in range(h):
-        for j in range(w):
-            if mask[i][j]:
-                img[i][j] = white
-            else:
-                img[i][j] = black
-    img_mask = Image.fromarray(img)
+    img_mask = Image.fromarray(mask)
     img_mask.save(os.path.join(args.maskdir,f'{maskname}.{ext}'))
-
 
 if __name__ == "__main__":
     args = parsing()
