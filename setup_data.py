@@ -130,14 +130,15 @@ def masking(args,filepath,result):
         coor = set()
         c1,r1,c2,r2 = map(int,result[0][target][k][:-1])
         temp = result[1][target][k]
-        for i in range(r1,r2+1):
-            for j in range(c1,c2+1):
+        for i in range(r1-1,r2):
+            for j in range(c1-1,c2):
                 if temp[i][j]:
                     coor.add((i,j))
         # 객체 크기가 threshold 보다 크면 마스킹 포함
         if len(coor) / size > args.area_thr:
-            coors.intersection_update(coor)
-        
+            # print((c1,r1),(c2,r2))
+            # print(len(coor) / size, args.area_thr)
+            coors.update(coor)
     # masking
     for i,j in coors:
         mask[i][j] = 255

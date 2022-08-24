@@ -82,10 +82,10 @@ def main(args):
         
         cv2.imshow('Mask_origin',mask)
         cv2.createTrackbar('Iter','Mask_margin',0,10,lambda x:x)
-        cv2.createTrackbar('Size','Mask_margin',6,14,lambda x:x)
+        cv2.createTrackbar('Size','Mask_margin',6,96,lambda x:x)
         cv2.setTrackbarMin('Size','Mask_margin',6)
         while True:
-            k = cv2.waitKey(1) & 0xFF
+            k = cv2.waitKey(10) & 0xFF
             if k == 27:
                 break
             if k == ord('s'):
@@ -99,7 +99,7 @@ def main(args):
                 print("result is saved in",filepath)
                 break
             k_size = cv2.getTrackbarPos('Size','Mask_margin') // 2
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (k_size,k_size))
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_size,k_size))
             n = cv2.getTrackbarPos('Iter','Mask_margin')
             mask_margin = cv2.dilate(mask, kernel, iterations = n)
             cv2.imshow('Mask_margin',mask_margin)
@@ -130,7 +130,7 @@ def main(args):
         img_merged = np.concatenate([img1,img2],axis=1)
         cv2.imshow('Compare',img_merged)
         while True:
-            k = cv2.waitKey(1) & 0xFF
+            k = cv2.waitKey(10) & 0xFF
             if k == 27:
                 break
         cv2.destroyAllWindows()
