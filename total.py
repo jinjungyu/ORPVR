@@ -1,4 +1,5 @@
 import cv2
+import json
 import os
 import importlib
 import numpy as np
@@ -43,6 +44,7 @@ def segmentation(args,model):
         # rate = (len(coor) / size) * 100
         # for i,j in coor:
         #     mask[i][j] = rate
+    cv2.imwrite(os.path.join(args.imgdir,args.fname+'.'+args.ext), img)
     return img,mask,objects
         
 def postprocess(image):
@@ -69,39 +71,62 @@ def inpainting(args,img,mask,model):
         # print(f"pred tensor: {pred_tensor.shape}")
         comp_tensor = (pred_tensor * mask_tensor + img_tensor * (1 - mask_tensor))
         comp_np = postprocess(comp_tensor[0])
-    
+    if args.show:
+        cv2.namedWindow('Result')
+        img_merged = np.concatenate([img,comp_np],axis=1)
+        cv2.imshow('Result',img_merged)
+        while True:
+            k = cv2.waitKey(100) & 0xFF
+            if k == 27:
+                break
+        cv2.destroyAllWindows()
     return comp_np
 
 def retargeting(img:np.ndarray):
     h,w,_ = img.shape
     new_w = (h * 16) // 9
-    return cv2.resize(img,dsize=(new_w,h),interpolation=cv2.INTER_CUBIC)
+    img_retarget = cv2.resize(img,dsize=(new_w,h),interpolation=cv2.INTER_CUBIC)
+    if args.show:
+        cv2.namedWindow('Result')
+        img_merged = np.concatenate([img,img_retarget],axis=1)
+        cv2.imshow('Result',img_merged)
+        while True:
+            k = cv2.waitKey(100) & 0xFF
+            if k == 27:
+                break
+        cv2.destroyAllWindows()
+    
+    return img_retarget
 
 def repainting(args,img_org,img_inpainted,objects):
-    result_dir = 'result'
-    if not os.path.exists(result_dir):
-        os.mkdir(result_dir)
-    filename = os.path.basename(args.img).split('.')[0]
     w = img_org.shape[1]
+    anchor = w // 4
     new_w = img_inpainted.shape[1]
-    diff = (new_w - w) // 2
     for k in range(len(objects['box'])):
         c1,r1,c2,r2 = objects['box'][k]
+        x_center = (c1+c2) // 2
+        if x_center < anchor or x_center > w - anchor:
+            diff = 0
+        else:
+            diff = (new_w - w) // 2
+        diff = 0
         mk = objects['mask'][k]
         for i in range(r1-1,r2):
             for j in range(c1-1,c2):
                 if mk[i][j]:
                     img_inpainted[i][j+diff] = img_org[i][j]
-    cv2.namedWindow('Result')
-    img_merged = np.concatenate([img_org,img_inpainted],axis=1)
-    cv2.imshow('Result',img_merged)
-    while True:
-        k = cv2.waitKey(100) & 0xFF
-        if k == 27:
-            cv2.imwrite(os.path.join(result_dir,filename+"_inpainted.png"), img_inpainted)
-            print('inpainting finish!')
-            print('[**] save successfully!')
-            break
+    if args.show:
+        cv2.namedWindow('Result')
+        img_merged = np.concatenate([img_org,img_inpainted],axis=1)
+        cv2.imshow('Result',img_merged)
+        while True:
+            k = cv2.waitKey(100) & 0xFF
+            if k == 27:
+                break
+        cv2.destroyAllWindows()
+    cv2.imwrite(os.path.join(args.resultdir,args.fname+'_inpainted.'+args.ext), img_inpainted)
+    # print('inpainting finish!')
+    # print('[**] save successfully!')
 
 def area_cutting(img:np.ndarray,mask:np.ndarray):
     global params
@@ -126,34 +151,44 @@ def area_cutting(img:np.ndarray,mask:np.ndarray):
 
 def addmargin(mask):
     global params
-    winshape = [cv2.MORPH_CROSS,cv2.MORPH_RECT,cv2.MORPH_ELLIPSE]
-    win='0:Cross\n1:Ellipse\n2:Rect'
-    cv2.namedWindow('Mask_origin')
-    cv2.namedWindow('Mask_margin')
-    
-    cv2.imshow('Mask_origin',mask)
-    cv2.createTrackbar('Iter','Mask_margin',0,10,lambda x:x)
-    cv2.createTrackbar(win,'Mask_margin',0,2,lambda x:x)
-    cv2.createTrackbar('Size','Mask_margin',3,7,lambda x:x)
-    cv2.setTrackbarMin('Size','Mask_margin',3)
-    while True:
-        k = cv2.waitKey(50) & 0xFF
-        if k == 27:
-            break
-        k_size = cv2.getTrackbarPos('Size','Mask_margin')
-        winidx = cv2.getTrackbarPos(win,'Mask_margin')
-        n = cv2.getTrackbarPos('Iter','Mask_margin')
-        kernel = cv2.getStructuringElement(winshape[winidx], (k_size,k_size))
-        mask_margin = cv2.dilate(mask, kernel, iterations = n)
-        cv2.imshow('Mask_margin',mask_margin)
-    cv2.destroyAllWindows()
-    params['winshape'] = winshape[winidx]
-    params['ksize'] = k_size
-    params['Iter'] = n
+    if args.show:
+        winshape = [cv2.MORPH_CROSS,cv2.MORPH_ELLIPSE,cv2.MORPH_RECT]
+        win='0:Cross\n1:Ellipse\n2:Rect'
+        cv2.namedWindow('Mask_origin')
+        cv2.namedWindow('Mask_margin')
+        
+        cv2.imshow('Mask_origin',mask)
+        cv2.createTrackbar('Iter','Mask_margin',0,10,lambda x:x)
+        cv2.createTrackbar(win,'Mask_margin',0,2,lambda x:x)
+        cv2.createTrackbar('Size','Mask_margin',3,7,lambda x:x)
+        cv2.setTrackbarMin('Size','Mask_margin',3)
+        while True:
+            k = cv2.waitKey(50) & 0xFF
+            if k == 27:
+                break
+            k_size = cv2.getTrackbarPos('Size','Mask_margin')
+            winidx = cv2.getTrackbarPos(win,'Mask_margin')
+            n = cv2.getTrackbarPos('Iter','Mask_margin')
+            kernel = cv2.getStructuringElement(winshape[winidx], (k_size,k_size))
+            mask_margin = cv2.dilate(mask, kernel, iterations = n)
+            cv2.imshow('Mask_margin',mask_margin)
+        cv2.destroyAllWindows()
+        params['winshape'] = winshape[winidx]
+        params['ksize'] = k_size
+        params['Iter'] = n
+        with open("params.json","w") as f:
+            json.dump(params,f)
+    else:
+        with open("params.json","r") as f:
+            params = json.load(f)
+        kernel = cv2.getStructuringElement(params['winshape'], (params['ksize'],params['ksize']))
+        mask_margin = cv2.dilate(mask, kernel, iterations = params['Iter'])
+    cv2.imwrite(os.path.join(args.maskdir,args.fname+'.'+args.ext), mask_margin)
     return mask_margin
 
 def comparing(img,mask,mask_margin):
     global params
+    h,w,_ = img.shape
     
     mask = mask > 0
     mask_margin = mask_margin > 0
@@ -195,13 +230,47 @@ def main(args):
     model_aot.load_state_dict(torch.load("AOT-GAN-for-Inpainting/experiments/G0000000.pt", map_location=args.device))
     model_aot.eval()
     
-    # img = cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
-    img_org,mask,objects = segmentation(args, model_m2f)
-    mask_margin = addmargin(mask)
-    img_inpainted = inpainting(args,img_org,mask_margin,model_aot)
-    img_retarget = retargeting(img_inpainted)
-    img_result = repainting(args,img_org,img_retarget,objects)
-    
+    datadir = 'dataset'
+    if os.path.isdir(args.src):
+        clip = os.path.basename(args.src)
+        args.imgdir = os.path.join(datadir,clip,'images')
+        args.maskdir = os.path.join(datadir,clip,'masks')
+        args.resultdir = os.path.join('result',clip)
+        os.makedirs(args.imgdir,exist_ok=True)
+        os.makedirs(args.maskdir,exist_ok=True)
+        os.makedirs(args.resultdir,exist_ok=True)
+        
+        img_list = []
+        for ext in ['*.jpg', '*.png']: 
+            img_list.extend(glob(os.path.join(args.src, ext)))
+        img_list.sort()
+        for imgpath in img_list:
+            args.img = imgpath
+            args.fname, args.ext = os.path.basename(args.img).split('.')
+            img_org,mask,objects = segmentation(args, model_m2f)
+            mask_margin = addmargin(mask)
+            img_inpainted = inpainting(args,img_org,mask_margin,model_aot)
+            img_retarget = retargeting(img_inpainted)
+            img_result = repainting(args,img_org,img_retarget,objects)
+    else:
+        args.img = args.src
+        args.imgdir = os.path.join(datadir,'single','images')
+        args.maskdir = os.path.join(datadir,'single','masks')
+        args.resultdir = os.path.join('result','single')
+        os.makedirs(args.imgdir,exist_ok=True)
+        os.makedirs(args.maskdir,exist_ok=True)
+        os.makedirs(args.resultdir,exist_ok=True)
+        args.fname, args.ext = os.path.basename(args.img).split('.')
+        img_org,mask,objects = segmentation(args, model_m2f)
+        if args.show:
+            area_cutting(img_org,mask)
+        mask_margin = addmargin(mask)
+        if args.show:
+            comparing(img_org,mask,mask_margin)
+        img_inpainted = inpainting(args,img_org,mask_margin,model_aot)
+        img_retarget = retargeting(img_inpainted)
+        img_result = repainting(args,img_org,img_retarget,objects)
+        
     # print("Result")
     # for k,v in params.items():
     #     print(f"{k} : {v}")
