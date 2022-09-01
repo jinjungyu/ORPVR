@@ -12,19 +12,25 @@ from torchvision.transforms import ToTensor
 
 from mmdetection.mmdet.apis import inference_detector,init_detector
 
-target = 0 # person
+# 0 person
+target = 0
+# 24 backpack
+# 26 handbag
+# 28 suitcase
+# 67 cell phone
+subtarget = [24,26,28,67]
 
-def segmentation(args,model):
+def segmentation_v1(args,model):
     result = inference_detector(model,args.img)
     img = cv2.imread(args.img,cv2.IMREAD_COLOR)
 
     h,w,_ = img.shape
     size = h*w
-    # mask = np.zeros((h,w),dtype=np.float32)
+
     mask = np.zeros((h,w),dtype=np.uint8)
-    
-    objects = {'box':[],'mask':[]}
-    for k in range(len(result[0][target])):
+    # objects = {'box':[],'mask':[]}
+    coors = []
+    for k in range(len(result[0][target])): # 각 사람 돌기
         score = result[0][target][k][-1]
         # score threshold 보다 낮은 박스는 무시
         if score < args.score_thr:
@@ -36,17 +42,31 @@ def segmentation(args,model):
             for j in range(c1-1,c2):
                 if temp[i][j]:
                     coor.add((i,j))
+        # 사람 객체가 작으면 마스킹 X
+        if len(coor) / size < args.area_thr:
+            continue
+        # 서브 카테고리 마스킹
+        for subidx in subtarget:
+            for l in range(len(result[0][subidx])):
+                score = result[0][subidx][l][-1]
+                # score threshold 보다 낮은 박스는 무시
+                if score < args.score_thr:
+                    continue
+                nc1,nr1,nc2,nr2 = map(int,result[0][subidx][l][:-1])
+                subtemp = result[1][subidx][l]
+                # 서브 객체 박스가 사람 객체와 겹치면 포함
+                if (c1 < nc1 < c2 and r1 < nr1 < r2) or (c1 < nc2 < c2 and r1 < nr2 < r2):
+                    for i in range(nr1-1,nr2):
+                        for j in range(nc1-1,nc2):
+                            if subtemp[i][j]:
+                                coor.add((i,j))
         for i,j in coor:
             mask[i][j] = 255
-        objects['box'].append([c1,r1,c2,r2])
-        objects['mask'].append(temp)
-        # for area_cutting
-        # rate = (len(coor) / size) * 100
-        # for i,j in coor:
-        #     mask[i][j] = rate
+        coors.append(coor)
+
     cv2.imwrite(os.path.join(args.imgdir,args.fname+'.'+args.ext), img)
-    return img,mask,objects
-        
+    return img,mask,coors
+
 def postprocess(image):
     image = torch.clamp(image, -1., 1.)
     image = (image + 1) / 2.0 * 255.0
@@ -98,23 +118,14 @@ def retargeting(img:np.ndarray):
     
     return img_retarget
 
-def repainting(args,img_org,img_inpainted,objects):
+def repainting(args,img_org,img_inpainted,coors):
     w = img_org.shape[1]
-    anchor = w // 4
     new_w = img_inpainted.shape[1]
-    for k in range(len(objects['box'])):
-        c1,r1,c2,r2 = objects['box'][k]
-        x_center = (c1+c2) // 2
-        if x_center < anchor or x_center > w - anchor:
-            diff = 0
-        else:
-            diff = (new_w - w) // 2
-        diff = 0
-        mk = objects['mask'][k]
-        for i in range(r1-1,r2):
-            for j in range(c1-1,c2):
-                if mk[i][j]:
-                    img_inpainted[i][j+diff] = img_org[i][j]
+    for k in range(len(coors)):
+        # diff = (new_w - w) // 2 # datadir1
+        diff = 0 # datadir2
+        for i,j in coors[k]:
+            img_inpainted[i][j+diff] = img_org[i][j]
     if args.show:
         cv2.namedWindow('Result')
         img_merged = np.concatenate([img_org,img_inpainted],axis=1)
@@ -128,26 +139,26 @@ def repainting(args,img_org,img_inpainted,objects):
     # print('inpainting finish!')
     # print('[**] save successfully!')
 
-def area_cutting(img:np.ndarray,mask:np.ndarray):
-    global params
-    cv2.namedWindow('Image')
-    cv2.namedWindow('Mask')
+# def area_cutting(img:np.ndarray,mask:np.ndarray):
+#     global params
+#     cv2.namedWindow('Image')
+#     cv2.namedWindow('Mask')
     
-    cv2.imshow('Image',img)
-    cv2.createTrackbar('Area_Threshold','Mask',0,10000,lambda x:x)
-    while True:
-        k = cv2.waitKey(50) & 0xFF
-        if k == 27:
-            break
+#     cv2.imshow('Image',img)
+#     cv2.createTrackbar('Area_Threshold','Mask',0,10000,lambda x:x)
+#     while True:
+#         k = cv2.waitKey(50) & 0xFF
+#         if k == 27:
+#             break
         
-        a = cv2.getTrackbarPos('Area_Threshold','Mask')
-        a /= 100 # 0.00 ~ 100.00
+#         a = cv2.getTrackbarPos('Area_Threshold','Mask')
+#         a /= 100 # 0.00 ~ 100.00
         
-        img_mask = cv2.threshold(mask,a,255,cv2.THRESH_BINARY)[1]
-        cv2.imshow('Mask',img_mask)
-    cv2.destroyAllWindows()
-    params['area_thr']=a
-    return img_mask
+#         img_mask = cv2.threshold(mask,a,255,cv2.THRESH_BINARY)[1]
+#         cv2.imshow('Mask',img_mask)
+#     cv2.destroyAllWindows()
+#     params['area_thr']=a
+#     return img_mask
 
 def addmargin(mask):
     global params
@@ -230,12 +241,13 @@ def main(args):
     model_aot.load_state_dict(torch.load("AOT-GAN-for-Inpainting/experiments/G0000000.pt", map_location=args.device))
     model_aot.eval()
     
-    datadir = 'dataset'
+    datadir = args.dstdir
+    resultdir = args.resdir
     if os.path.isdir(args.src):
         clip = os.path.basename(args.src)
         args.imgdir = os.path.join(datadir,clip,'images')
         args.maskdir = os.path.join(datadir,clip,'masks')
-        args.resultdir = os.path.join('result',clip)
+        args.resultdir = os.path.join(resultdir,clip)
         os.makedirs(args.imgdir,exist_ok=True)
         os.makedirs(args.maskdir,exist_ok=True)
         os.makedirs(args.resultdir,exist_ok=True)
@@ -247,21 +259,21 @@ def main(args):
         for imgpath in img_list:
             args.img = imgpath
             args.fname, args.ext = os.path.basename(args.img).split('.')
-            img_org,mask,objects = segmentation(args, model_m2f)
+            img_org,mask,coors = segmentation_v1(args, model_m2f)
             mask_margin = addmargin(mask)
             img_inpainted = inpainting(args,img_org,mask_margin,model_aot)
             img_retarget = retargeting(img_inpainted)
-            img_result = repainting(args,img_org,img_retarget,objects)
+            img_result = repainting(args,img_org,img_retarget,coors)
     else:
         args.img = args.src
         args.imgdir = os.path.join(datadir,'single','images')
         args.maskdir = os.path.join(datadir,'single','masks')
-        args.resultdir = os.path.join('result','single')
+        args.resultdir = os.path.join(resultdir,'single')
         os.makedirs(args.imgdir,exist_ok=True)
         os.makedirs(args.maskdir,exist_ok=True)
         os.makedirs(args.resultdir,exist_ok=True)
         args.fname, args.ext = os.path.basename(args.img).split('.')
-        img_org,mask,objects = segmentation(args, model_m2f)
+        img_org,mask,coors = segmentation_v1(args, model_m2f)
         if args.show:
             area_cutting(img_org,mask)
         mask_margin = addmargin(mask)
@@ -269,7 +281,7 @@ def main(args):
             comparing(img_org,mask,mask_margin)
         img_inpainted = inpainting(args,img_org,mask_margin,model_aot)
         img_retarget = retargeting(img_inpainted)
-        img_result = repainting(args,img_org,img_retarget,objects)
+        img_result = repainting(args,img_org,img_retarget,coors)
         
     # print("Result")
     # for k,v in params.items():

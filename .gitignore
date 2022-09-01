@@ -1,9 +1,9 @@
+dataset*
 dataset
-dataset2
 mmdetection
 rawdataset/**
 val.zip
 AOT-GAN-for-Inpainting
 cropset
-result
-test
+result*
+test*
