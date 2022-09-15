@@ -7,19 +7,20 @@ parser = argparse.ArgumentParser()
 parser.add_argument('src', help='Frame Directory')
 args = parser.parse_args()
 
+viddir = './video'
+
 path = args.src
+_,model,mode,clip = args.src.split('/')
+dstdir = os.path.join(viddir,model,mode)
+os.makedirs(dstdir,exist_ok=True)
+pathOut = os.path.join(dstdir,f'{clip}.mp4')
+
 img_list = []
 for ext in ['*.jpg', '*.png']: 
     img_list.extend(glob(os.path.join(path, ext)))
 img_list.sort()
 
-viddir = os.path.join('result','video')
-if not os.path.exists(viddir):
-    os.mkdir(viddir)
-    
-clip = os.path.basename(args.src)
-pathOut = os.path.join(viddir,f'{clip}.mp4')
-fps = 15
+fps = 20
 frame_array = []
 for idx , path in enumerate(img_list) : 
     img = cv2.imread(path)
