@@ -48,7 +48,7 @@ def segmentation(args,model):
                 nc1,nr1,nc2,nr2 = map(int,result[0][subidx][l][:-1])
                 subtemp = result[1][subidx][l]
                 # 서브 객체 박스가 사람 객체와 겹치면 포함
-                if (c1 < nc1 < c2 and r1 < nr1 < r2) or (c1 < nc2 < c2 and r1 < nr2 < r2):
+                if (c1 <= nc1 <= c2 and r1 <= nr1 <= r2) or (c1 <= nc2 <= c2 and r1 <= nr2 <= r2):
                     for i in range(nr1-1,nr2):
                         for j in range(nc1-1,nc2):
                             if subtemp[i][j]:

@@ -9,17 +9,17 @@ from tqdm import tqdm
 import torch
 
 from util.option_relocate import args, Relocator
-
+            
 def main(args):
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    modes = ['original','offset','patch','dynamic']
-    clip = os.path.basename(args.src)
-    modelname = os.path.basename(os.path.dirname(args.src))
+    modes = ['original','offset','dynamic']
+    modelname = os.path.basename(args.src)
+    clip = os.path.basename(os.path.dirname(args.src))
     
     bimgdir = args.src
     imgdir = os.path.join('dataset',clip,'images')
     objdir = os.path.join('dataset',clip,'objects')
-    args.resultdir = os.path.join(args.dstdir,modelname,modes[args.mode],clip)
+    args.resultdir = os.path.join(args.dstdir,clip,modelname,modes[args.mode])
     os.makedirs(args.resultdir,exist_ok=True)
     
     flist = []
@@ -34,10 +34,13 @@ def main(args):
     
     olist = glob(os.path.join(objdir,'*.json'))
     olist.sort()
-    
+
     bimg = cv2.imread(flist[0],cv2.IMREAD_COLOR)
     args.h,args.w,_ = bimg.shape
     args.new_w = int(np.ceil(args.h * 16 / 9)) # 640 -> 854
+    # if args.mode == 2:
+    #     with open(olist[0],"r") as f:
+    #         args.first_objects = json.load(f)
     
     relocator = Relocator(args)
     

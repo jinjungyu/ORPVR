@@ -18,7 +18,8 @@ def main(args):
     clip = os.path.basename(args.src)
     args.imgdir = os.path.join(args.src,'images')
     args.maskdir = os.path.join(args.src,'masks')
-    args.resultdir = os.path.join(args.dstdir,args.model,clip)
+    args.resultdir = os.path.join(args.dstdir,clip,args.model)
+    
     os.makedirs(args.resultdir,exist_ok=True)
     
     flist = os.listdir(args.imgdir)

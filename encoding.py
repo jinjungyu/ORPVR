@@ -1,5 +1,6 @@
 import argparse
 import cv2
+from tqdm import tqdm
 from glob import glob
 import os
 
@@ -10,10 +11,10 @@ args = parser.parse_args()
 viddir = './video'
 
 path = args.src
-_,model,mode,clip = args.src.split('/')
-dstdir = os.path.join(viddir,model,mode)
+_,clip,model,mode = args.src.split('/')
+dstdir = os.path.join(viddir,clip)
 os.makedirs(dstdir,exist_ok=True)
-pathOut = os.path.join(dstdir,f'{clip}.mp4')
+pathOut = os.path.join(dstdir,f'{model}_{mode}.mp4')
 
 img_list = []
 for ext in ['*.jpg', '*.png']: 
@@ -22,7 +23,7 @@ img_list.sort()
 
 fps = 20
 frame_array = []
-for idx , path in enumerate(img_list) : 
+for idx , path in tqdm(enumerate(img_list)) : 
     img = cv2.imread(path)
     height, width, layers = img.shape
     size = (width,height)
