@@ -9,7 +9,7 @@ import torch
 
 from mmdetection.mmdet.apis import inference_detector,init_detector
 
-from util.option_masking import args
+from util.option_masking import args,compute_intersect_area
 
 target = 0
 subtarget = [24,26,28,67]
@@ -31,14 +31,15 @@ def segmentation(args,model):
         coor = set()
         c1,r1,c2,r2 = map(int,result[0][target][k][:-1])
         temp = result[1][target][k]
-        for i in range(r1-1,r2):
-            for j in range(c1-1,c2):
+        for i in range(r1,r2):
+            for j in range(c1,c2):
                 if temp[i][j]:
                     coor.add((i,j))
         # 사람 객체가 작으면 마스킹 X
         if len(coor) / size < args.area_thr:
             continue
         # 서브 카테고리 마스킹
+        x1,y1,x2,y2 = c1,r1,c2,r2
         for subidx in subtarget:
             for l in range(len(result[0][subidx])):
                 score = result[0][subidx][l][-1]
@@ -48,15 +49,26 @@ def segmentation(args,model):
                 nc1,nr1,nc2,nr2 = map(int,result[0][subidx][l][:-1])
                 subtemp = result[1][subidx][l]
                 # 서브 객체 박스가 사람 객체와 겹치면 포함
-                if (c1 <= nc1 <= c2 and r1 <= nr1 <= r2) or (c1 <= nc2 <= c2 and r1 <= nr2 <= r2):
-                    for i in range(nr1-1,nr2):
-                        for j in range(nc1-1,nc2):
+                # if (c1 <= nc1 <= c2 and r1 <= nr1 <= r2) or (c1 <= nc2 <= c2 and r1 <= nr2 <= r2):
+                #     x1,y1,x2,y2 = min(x1,nc1), min(y1,nr1), max(x2,nc2), max(y2,nr2)
+                #     for i in range(nr1,nr2):
+                #         for j in range(nc1,nc2):
+                #             if subtemp[i][j]:
+                #                 coor.add((i,j))
+                # 2022/09/20 : 서브 카테고리 박스가 30% 이상 겹쳐야 포함으로 결정
+                nsize = (nr2-nr1) * (nc2-nc1)
+                interarea = compute_intersect_area([c1,r1,c2,r2],[nc1,nr1,nc2,nr2])
+                if interarea / nsize > 0.3:
+                    x1,y1,x2,y2 = min(x1,nc1), min(y1,nr1), max(x2,nc2), max(y2,nr2)
+                    for i in range(nr1,nr2):
+                        for j in range(nc1,nc2):
                             if subtemp[i][j]:
                                 coor.add((i,j))
         for i,j in coor:
             mask[i][j] = 255
-        objects['box'].append([c1,r1,c2,r2])
-        objects['coor'].append(list(coor))
+        
+        objects['box'].append([x1,y1,x2,y2])
+        objects['coor'].append(sorted(list(coor)))
 
     cv2.imwrite(os.path.join(args.imgdir,args.fname+'.'+args.ext), img)
     cv2.imwrite(os.path.join(args.maskdir,args.fname+'.'+args.ext), mask)

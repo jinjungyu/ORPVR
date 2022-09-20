@@ -2,6 +2,7 @@ import cv2
 import os
 import numpy as np
 import json
+import matplotlib.pyplot as plt
 
 from glob import glob
 from tqdm import tqdm
@@ -38,9 +39,6 @@ def main(args):
     bimg = cv2.imread(flist[0],cv2.IMREAD_COLOR)
     args.h,args.w,_ = bimg.shape
     args.new_w = int(np.ceil(args.h * 16 / 9)) # 640 -> 854
-    # if args.mode == 2:
-    #     with open(olist[0],"r") as f:
-    #         args.first_objects = json.load(f)
     
     relocator = Relocator(args)
     
@@ -55,11 +53,15 @@ def main(args):
         with open(olist[i],"r") as f:
             objects = json.load(f)
         # Boxes and Objects
-        for bbox,coor in zip(objects['box'],objects['coor']):
-            for i,j in coor:
-                ni, nj = relocator(i,j,bbox)
-                bimg[ni][nj] = img[i][j]
-        cv2.imwrite(os.path.join(args.resultdir,fname), bimg)
+        # print(fname)
+        frames = relocator(bimg,img,objects)
+
+        if len(frames) == 1:
+            cv2.imwrite(os.path.join(args.resultdir,fname), frames[0])
+        else:
+            for i in range(len(frames)):
+                newfname = fname.replace('.',f'_{i}.')
+                cv2.imwrite(os.path.join(args.resultdir,newfname), frames[i])
     print(f"Object Relocated Images are stored in {args.resultdir}")
     print("Complete")
 

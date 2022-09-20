@@ -23,7 +23,7 @@ for model in models:
         frames = [Image.open(f) for f in fnames]
         videos.append(frames)
 
-fig = plt.figure('Let us enjoy the result',figsize=(12,8))
+fig = plt.figure(figsize=(12,8))
 imdatas=[]
 for i in range(6):
     ax = fig.add_subplot(2, 3, i+1)
