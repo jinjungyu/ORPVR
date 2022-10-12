@@ -55,8 +55,10 @@ def main(args):
         # Boxes and Objects
         # print(fname)
         frames = relocator(bimg,img,objects)
-
-        if len(frames) == 1:
+        
+        if not isinstance(frames,list):
+            cv2.imwrite(os.path.join(args.resultdir,fname), frames)
+        elif len(frames) == 1:
             cv2.imwrite(os.path.join(args.resultdir,fname), frames[0])
         else:
             for i in range(len(frames)):

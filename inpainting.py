@@ -24,6 +24,8 @@ def main(args):
     
     flist = os.listdir(args.imgdir)
     flist.sort()
+    mlist = os.listdir(args.maskdir)
+    mlist.sort()
     
     if args.model == 'aotgan':
         def postprocess(image):
@@ -42,7 +44,7 @@ def main(args):
         model.eval()
         
         frames = [cv2.imread(os.path.join(args.imgdir,f),cv2.IMREAD_COLOR) for f in flist]
-        masks = [cv2.imread(os.path.join(args.maskdir,f),cv2.IMREAD_GRAYSCALE) for f in flist]
+        masks = [cv2.imread(os.path.join(args.maskdir,f),cv2.IMREAD_GRAYSCALE) for f in mlist]
 
         args.h,args.w,_ = frames[0].shape
         args.new_w = int(np.ceil(args.h * 16 / 9))
@@ -131,7 +133,7 @@ def main(args):
         model.eval()
         
         ilist = [os.path.join(args.imgdir,f) for f in flist]
-        mlist = [os.path.join(args.maskdir,f) for f in flist]
+        mlist = [os.path.join(args.maskdir,f) for f in mlist]
         
         frames = read_frame_from_videos(ilist)
         frames, size = resize_frames(frames, size)

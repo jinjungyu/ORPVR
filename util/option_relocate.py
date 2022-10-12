@@ -27,7 +27,7 @@ class Relocator:
             self.pre = None
             self.state_offset = [0, self.offset_half, self.offset]
             self.augment = False
-            self.n_augframes = 2
+            self.n_augframes = 4
     def __call__(self,bimg,img,objects):        
         if self.mode == 0:
             newimg = bimg.copy()
@@ -96,8 +96,16 @@ class Relocator:
                         for l in range(len(indices)):
                             idx = indices[l]
                             if idx is not None: # None이면 이전에 없었던 것이거나 가장자리(가정)
-                                for i,j in obj['coor'][idx]:
-                                    aug_img[i][j+offsets[idx]+self.state_offset[states[idx]]] = im[i][j]
+                                try:
+                                    for i,j in obj['coor'][idx]:
+                                        aug_img[i][j+offsets[idx]+self.state_offset[states[idx]]] = im[i][j]
+                                except:
+                                    print("flags",flags)
+                                    print("pre_flags",pre_flags)
+                                    print("match_ids",match_ids)
+                                    print("i,j",i,j)
+                                    print("j,offsets[idx],self.state_offset[states[idx]])",j,offsets[idx],self.state_offset[states[idx]])
+                                    print("j+offsets[idx]+self.state_offset[states[idx]]",j+offsets[idx]+self.state_offset[states[idx]])
                         augframes.append(aug_img)
                 self.augment = False
             else:    

@@ -6,7 +6,7 @@ import argparse
 from glob import glob
 
 models = ['aotgan','e2fgvi_hq']
-modes= ['original','offset','patch']
+modes= ['original','offset','dynamic']
 
 parser = argparse.ArgumentParser()
 parser.add_argument('clip', help='clipname')
@@ -16,7 +16,7 @@ videos=[]
 srcdir = './result'
 for model in models:
     for mode in modes:
-        clipdir = os.path.join(srcdir,model,mode,args.clip)
+        clipdir = os.path.join(srcdir,args.clip,model,mode)
         for ext in ['*.png','*.jpg']:
             fnames = glob(os.path.join(clipdir,ext))
         fnames.sort()

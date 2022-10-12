@@ -71,7 +71,7 @@ def segmentation(args,model):
         objects['coor'].append(sorted(list(coor)))
 
     cv2.imwrite(os.path.join(args.imgdir,args.fname+'.'+args.ext), img)
-    cv2.imwrite(os.path.join(args.maskdir,args.fname+'.'+args.ext), mask)
+    cv2.imwrite(os.path.join(args.maskdir,args.fname+'.png'), mask)
     with open(os.path.join(args.objdir,args.fname+'.json'),"w") as f:
         json.dump(objects,f)
 
