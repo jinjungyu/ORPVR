@@ -5,5 +5,3 @@ lucia
 judo
 parkour
 schoolgirls
-tennis
-hockey
