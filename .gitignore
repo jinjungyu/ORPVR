@@ -1,13 +1,10 @@
-dataset*
-dataset
-mmdetection
-rawdataset/**
-val.zip
 AOT-GAN-for-Inpainting
+E2FGVI
+mmdetection
+*dataset*
 cropset
 result*
 test*
-E2FGVI
 video
 experiment
 vid_inp2
