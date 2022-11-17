@@ -2,7 +2,6 @@ import cv2
 import os
 import numpy as np
 import json
-import matplotlib.pyplot as plt
 
 from glob import glob
 from tqdm import tqdm
@@ -53,17 +52,17 @@ def main(args):
         with open(olist[i],"r") as f:
             objects = json.load(f)
         # Boxes and Objects
-        # print(fname)
-        frames = relocator(bimg,img,objects)
-        
-        if not isinstance(frames,list):
-            cv2.imwrite(os.path.join(args.resultdir,fname), frames)
-        elif len(frames) == 1:
-            cv2.imwrite(os.path.join(args.resultdir,fname), frames[0])
-        else:
-            for i in range(len(frames)):
-                newfname = fname.replace('.',f'_{i}.')
-                cv2.imwrite(os.path.join(args.resultdir,newfname), frames[i])
+        frame = relocator.relocate(bimg,img,objects)
+        cv2.imwrite(os.path.join(args.resultdir,fname), frame)
+    
+        # if not isinstance(frames,list):
+        #     cv2.imwrite(os.path.join(args.resultdir,fname), frames)
+        # elif len(frames) == 1:
+        #     cv2.imwrite(os.path.join(args.resultdir,fname), frames[0])
+        # else:
+        #     for i in range(len(frames)):
+        #         newfname = fname.replace('.',f'_{i}.')
+        #         cv2.imwrite(os.path.join(args.resultdir,newfname), frames[i])
     print(f"Object Relocated Images are stored in {args.resultdir}")
     print("Complete")
 

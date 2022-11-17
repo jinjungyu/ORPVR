@@ -11,15 +11,15 @@ from torchvision.transforms import ToTensor
 
 from util.option_inpaint import args
 
-
 def main(args):
-    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if args.device == None:
+        args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
+    # Path
     clip = os.path.basename(args.src)
     args.imgdir = os.path.join(args.src,'images')
     args.maskdir = os.path.join(args.src,'masks')
     args.resultdir = os.path.join(args.dstdir,clip,args.model)
-    
     os.makedirs(args.resultdir,exist_ok=True)
     
     flist = os.listdir(args.imgdir)
@@ -52,8 +52,8 @@ def main(args):
         for i in tqdm(range(len(frames))):
             frame, mask, fname  = frames[i], masks[i], flist[i]
             img_tensor = (ToTensor()(frame) * 2.0 - 1.0).unsqueeze(0).to(args.device)
-            mask = np.reshape(mask, (args.h,args.w,1))
-            mask = cv2.dilate(mask,dilate_kernel,iterations=4)
+            mask = np.expand_dims(mask,axis=-1)
+            mask = cv2.dilate(mask,dilate_kernel,iterations=4)                             # add margin to the mask using morphology dilate operation
 
             with torch.no_grad():
                 mask_tensor = (ToTensor()(mask)).unsqueeze(0).to(args.device)
@@ -64,9 +64,9 @@ def main(args):
             cv2.imwrite(os.path.join(args.resultdir,fname), comp_np)
         print(f"Inpainted Images are stored in {args.resultdir}")
         print("Complete")
-    else: # 'e2fgvi, e2fgvi_hq
-        ref_length = 10  # ref_step
-        num_ref = -1
+    else: # e2fgvi_hq
+        ref_length = 10  # reference frame index step 
+        num_ref = -1 # number of reference frame. if num_ref == -1, reference frames are contatined as much as possible.
         neighbor_stride = 5
         
         sys.path.append('./E2FGVI')
@@ -88,67 +88,54 @@ def main(args):
                         ref_index.append(i)
             return ref_index
 
-        # read frame-wise masks
-        def read_mask(mlist, size):
+        # read masks
+        def read_mask(mlist):
             masks = []
             for mp in mlist:
-                m = Image.open(mp)
-                m = m.resize(size, Image.NEAREST)
-                m = np.array(m.convert('L'))
-                m = np.array(m > 0).astype(np.uint8)
+                m = cv2.imread(mp,cv2.IMREAD_GRAYSCALE)
                 m = cv2.dilate(m,
                             cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)),
                             iterations=4)
-                masks.append(Image.fromarray(m * 255))
+                masks.append(Image.fromarray(m))
             return masks
 
-        #  read frames from video
-        def read_frame_from_videos(flist):
+        # read frames
+        def read_frame(flist):
             frames = []
             for fr in flist:
-                image = cv2.imread(fr)
-                image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                image = cv2.cvtColor(cv2.imread(fr), cv2.COLOR_BGR2RGB)
                 frames.append(image)
             return frames
 
-        # resize frames
-        def resize_frames(frames, size=None):
-            if size is not None:
-                frames = [f.resize(size) for f in frames]
-            else:
-                size = frames[0].size
-            return frames, size
-
-        if args.model == 'e2fgvi':
-            size = (432, 240)
-            args.ckpt = 'E2FGVI/release_model/E2FGVI-CVPR22.pth'
-        else:
-            args.ckpt = 'E2FGVI/release_model/E2FGVI-HQ-CVPR22.pth'
-            size = None
+        # E2FGVI model checkpoint
+        ckpt = 'E2FGVI/release_model/E2FGVI-HQ-CVPR22.pth'
             
         # E2FGVI Model
         net = importlib.import_module('model.' + args.model)
         model = net.InpaintGenerator().to(args.device)
-        model.load_state_dict(torch.load(args.ckpt, map_location=args.device))
+        model.load_state_dict(torch.load(ckpt, map_location=args.device))
         model.eval()
         
         ilist = [os.path.join(args.imgdir,f) for f in flist]
         mlist = [os.path.join(args.maskdir,f) for f in mlist]
         
-        frames = read_frame_from_videos(ilist)
-        frames, size = resize_frames(frames, size)
-        h, w = size[1], size[0]
-        video_length = len(frames)
+        frames = read_frame(ilist)
         imgs = to_tensors()(frames).unsqueeze(0) * 2 - 1
-        frames = [np.array(f).astype(np.uint8) for f in frames]
-        masks = read_mask(mlist, size)
-        binary_masks = [
-            np.expand_dims((np.array(m) != 0).astype(np.uint8), 2) for m in masks
+        masks = read_mask(mlist)
+        binary_masks = [ # 0 or 1
+            np.expand_dims(np.array(m) // 255, -1) for m in masks
         ]
         masks = to_tensors()(masks).unsqueeze(0)
+
         # imgs, masks = imgs.to(args.device), masks.to(args.device)
+        h,w = frames[0].shape[:2]
+        video_length = len(frames)
         comp_frames = [None] * video_length
         
+        max_refs = 17       # if you encounters out-of-memory errors, use lower 'max_refs' value.
+                            # this value depends on gpu memory size.
+                            # In our experiment with NVIDIA RTX 3060 12GB, we use max_refs = 17
+
         for f in tqdm(range(0, video_length, neighbor_stride)):
             neighbor_ids = [
                 i for i in range(max(0, f - neighbor_stride),
@@ -156,9 +143,7 @@ def main(args):
             ]
             ref_ids = get_ref_index(f, neighbor_ids, video_length)
             
-            # 총 프레임 17개 넘어가면 현재 프레임에서 가장 먼 프레임 없애기
-            # 이렇게 해야 12GB 이하인 VRAM에서 640x480 해상도 출력 가능
-            for _ in range(max(0,len(ref_ids)+len(neighbor_ids) - 17)):
+            for _ in range(max(0,len(ref_ids)+len(neighbor_ids) - max_refs)):
                 if abs(f-ref_ids[0]) < abs(f-ref_ids[-1]):
                     ref_ids.pop()
                 else:
@@ -180,11 +165,13 @@ def main(args):
                 masked_imgs = torch.cat(
                     [masked_imgs, torch.flip(masked_imgs, [4])],
                     4)[:, :, :, :, :w + w_pad]
-                pred_imgs, _ = model(masked_imgs, len(neighbor_ids))
+
+                pred_imgs = model(masked_imgs, len(neighbor_ids))[0]
                 pred_imgs = pred_imgs[:, :, :h, :w]
-                pred_imgs = (pred_imgs + 1) / 2
-                pred_imgs = pred_imgs.cpu().permute(0, 2, 3, 1).numpy() * 255
-                torch.cuda.empty_cache() # GPU 캐시를 정리해서 GPU 공간 확보
+                pred_imgs = (pred_imgs + 1) / 2 * 255
+                pred_imgs = pred_imgs.permute(0, 2, 3, 1).cpu().numpy()
+
+                # torch.cuda.empty_cache()
                 for i in range(len(neighbor_ids)):
                     idx = neighbor_ids[i]
                     img = np.array(pred_imgs[i]).astype(

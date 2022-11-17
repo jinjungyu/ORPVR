@@ -1,9 +1,10 @@
-import cv2
 import os
-import numpy as np
+import cv2
+from shutil import copy
 import json
 from tqdm import tqdm
 from glob import glob
+import numpy as np
 
 import torch
 
@@ -15,67 +16,59 @@ target = 0
 subtarget = [24,26,28,67]
 
 def segmentation(args,model):
-    result = inference_detector(model,args.img)
-    img = cv2.imread(args.img,cv2.IMREAD_COLOR)
-
-    size = args.h*args.w
+    fname = os.path.basename(args.imgpath)[0]
+    result = inference_detector(model,args.imgpath)
 
     mask = np.zeros((args.h,args.w),dtype=np.uint8)
     objects = {'box':[],'coor':[]}
 
-    for k in range(len(result[0][target])): # 각 사람 돌기
+    for k in range(len(result[0][target])):
+        # -------- masking person object --------
         score = result[0][target][k][-1]
-        # score threshold 보다 낮은 박스는 무시
-        if score < args.score_thr:
+        if score < args.score_thr:                                               # if the score is less than score threshold, ignore this objects.
             continue
-        coor = set()
+        coor = set()                                                             # counting the pixel of objects
         c1,r1,c2,r2 = map(int,result[0][target][k][:-1])
-        temp = result[1][target][k]
+        pred = result[1][target][k]
         for i in range(r1,r2):
             for j in range(c1,c2):
-                if temp[i][j]:
+                if pred[i][j]:
                     coor.add((i,j))
-        # 사람 객체가 작으면 마스킹 X
-        if len(coor) / size < args.area_thr:
+        if len(coor) / args.size < args.area_thr:                                     # if the area of person is less than area threshold, ignore this objects.
             continue
-        # 서브 카테고리 마스킹
+        
+        # -------- masking subcategory object --------
         x1,y1,x2,y2 = c1,r1,c2,r2
         for subidx in subtarget:
             for l in range(len(result[0][subidx])):
                 score = result[0][subidx][l][-1]
-                # score threshold 보다 낮은 박스는 무시
-                if score < args.score_thr:
+                if score < args.score_thr:                                       # if the score is less than score threshold, ignore this objects.
                     continue
                 nc1,nr1,nc2,nr2 = map(int,result[0][subidx][l][:-1])
-                subtemp = result[1][subidx][l]
-                # 서브 객체 박스가 사람 객체와 겹치면 포함
-                # if (c1 <= nc1 <= c2 and r1 <= nr1 <= r2) or (c1 <= nc2 <= c2 and r1 <= nr2 <= r2):
-                #     x1,y1,x2,y2 = min(x1,nc1), min(y1,nr1), max(x2,nc2), max(y2,nr2)
-                #     for i in range(nr1,nr2):
-                #         for j in range(nc1,nc2):
-                #             if subtemp[i][j]:
-                #                 coor.add((i,j))
-                # 2022/09/20 : 서브 카테고리 박스가 30% 이상 겹쳐야 포함으로 결정
-                nsize = (nr2-nr1) * (nc2-nc1)
+                pred = result[1][subidx][l]
                 interarea = compute_intersect_area([c1,r1,c2,r2],[nc1,nr1,nc2,nr2])
-                if interarea / nsize > 0.3:
+                nsize = (nr2-nr1) * (nc2-nc1)
+                if interarea / nsize > 0.3:                                      # masking the subcategory object if the subcategory box overlaps more than 30% of its depended main object box(person).
                     x1,y1,x2,y2 = min(x1,nc1), min(y1,nr1), max(x2,nc2), max(y2,nr2)
                     for i in range(nr1,nr2):
                         for j in range(nc1,nc2):
-                            if subtemp[i][j]:
+                            if pred[i][j]:
                                 coor.add((i,j))
+
         for i,j in coor:
             mask[i][j] = 255
         
         objects['box'].append([x1,y1,x2,y2])
         objects['coor'].append(sorted(list(coor)))
 
-    cv2.imwrite(os.path.join(args.imgdir,args.fname+'.'+args.ext), img)
-    cv2.imwrite(os.path.join(args.maskdir,args.fname+'.png'), mask)
-    with open(os.path.join(args.objdir,args.fname+'.json'),"w") as f:
+    # cv2.imwrite(os.path.join(args.imgdir,args.fname+'.'+args.ext), img)
+    copy(args.imgpath,os.path.join(args.imgdir,fname+'.',args.ext))
+    cv2.imwrite(os.path.join(args.maskdir,fname+'.png'), mask)
+    with open(os.path.join(args.objdir,fname+'.json'),"w") as f:
         json.dump(objects,f)
 
-args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+if args.device == None:
+    args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 args.config = 'mmdetection/configs/mask2former/mask2former_swin-s-p4-w7-224_lsj_8x2_50e_coco.py'
 args.checkpoint = 'mmdetection/checkpoints/mask2former_swin-s-p4-w7-224_lsj_8x2_50e_coco_20220504_001756-743b7d99.pth'
@@ -96,11 +89,16 @@ if os.path.isdir(args.src):
     for ext in ['*.jpg', '*.png']: 
         img_list.extend(glob(os.path.join(args.src, ext)))
     img_list.sort()
-    tempimg = cv2.imread(img_list[0],cv2.IMREAD_COLOR)
-    args.h,args.w,_ = tempimg.shape
+    args.ext = os.path.basename(img_list[0]).split('.')[-1]
+    
+    tempimg = Image.open(img_list[0])
+    w,h = tempimg.size
+    # tempimg = cv2.imread(img_list[0],cv2.IMREAD_COLOR)
+    # args.h,args.w,_ = tempimg.shape
+    args.size = w*h
+
     for imgpath in tqdm(img_list):
-        args.img = imgpath
-        args.fname, args.ext = os.path.basename(args.img).split('.')
+        args.imgpath = imgpath
         segmentation(args, model_m2f)
 else:
     print(f"Directory {args.src} not exists.")

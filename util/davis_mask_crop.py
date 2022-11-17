@@ -1,9 +1,8 @@
 import cv2
 import os
-from glob import glob
 
-srcdir = 'rawdataset/DAVIS-2017_semantics-480p/DAVIS/Annotations_semantics/480p/'
-dstdir = 'rawdataset/MASK_DAVIS_640x480/'
+srcdir = '../rawdataset/DAVIS-2017_semantics-480p/DAVIS/Annotations_semantics/480p/'
+dstdir = '../rawdataset/MASK_DAVIS_640x480/'
 os.makedirs(dstdir,exist_ok=True)
 w = 854
 neww = 640
