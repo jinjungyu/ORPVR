@@ -14,6 +14,8 @@ def main(args):
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     modes = ['original','offset','dynamic']
     modelname = os.path.basename(args.src)
+    if args.src.endswith('/'):
+        args.src = args.src[:-1]
     clip = os.path.basename(os.path.dirname(args.src))
     
     bimgdir = args.src
@@ -31,7 +33,6 @@ def main(args):
     for ext in ['*.png','*.jpg']:
         ilist.extend(glob(os.path.join(imgdir,ext)))
     ilist.sort()
-    
     olist = glob(os.path.join(objdir,'*.json'))
     olist.sort()
 

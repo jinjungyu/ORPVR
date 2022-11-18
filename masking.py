@@ -16,7 +16,7 @@ target = 0
 subtarget = [24,26,28,67]
 
 def segmentation(args,model):
-    fname = os.path.basename(args.imgpath)[0]
+    fname = os.path.splitext(os.path.basename(args.imgpath))[0]
     result = inference_detector(model,args.imgpath)
 
     mask = np.zeros((args.h,args.w),dtype=np.uint8)
@@ -54,7 +54,7 @@ def segmentation(args,model):
                         for j in range(nc1,nc2):
                             if pred[i][j]:
                                 coor.add((i,j))
-
+        
         for i,j in coor:
             mask[i][j] = 255
         
@@ -62,7 +62,7 @@ def segmentation(args,model):
         objects['coor'].append(sorted(list(coor)))
 
     # cv2.imwrite(os.path.join(args.imgdir,args.fname+'.'+args.ext), img)
-    copy(args.imgpath,os.path.join(args.imgdir,fname+'.',args.ext))
+    copy(args.imgpath,os.path.join(args.imgdir,fname+'.'+args.ext))
     cv2.imwrite(os.path.join(args.maskdir,fname+'.png'), mask)
     with open(os.path.join(args.objdir,fname+'.json'),"w") as f:
         json.dump(objects,f)
@@ -92,8 +92,8 @@ if os.path.isdir(args.src):
     args.ext = os.path.basename(img_list[0]).split('.')[-1]
     
     tempimg = cv2.imread(img_list[0])
-    h,w,_ = tempimg.shape
-    args.size = h*w
+    args.h,args.w,_ = tempimg.shape
+    args.size = args.h*args.w
 
     for imgpath in tqdm(img_list):
         args.imgpath = imgpath

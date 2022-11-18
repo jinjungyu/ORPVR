@@ -16,6 +16,8 @@ def main(args):
         args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # Path
+    if args.src.endswith('/'):
+        args.src = args.src[:-1]
     clip = os.path.basename(args.src)
     args.imgdir = os.path.join(args.src,'images')
     args.maskdir = os.path.join(args.src,'masks')
@@ -65,8 +67,9 @@ def main(args):
         print(f"Inpainted Images are stored in {args.resultdir}")
         print("Complete")
     else: # e2fgvi_hq
-        ref_length = 10  # reference frame index step 
-        num_ref = -1 # number of reference frame. if num_ref == -1, reference frames are contatined as much as possible.
+        ref_length = 10     # reference frame index step 
+        num_ref = 6        # number of reference frame. if num_ref == -1, reference frames are contatined as much as possible.
+                            # if you encounters out-of-memory errors, use lower 'num_refs' value.
         neighbor_stride = 5
         
         sys.path.append('./E2FGVI')
@@ -80,7 +83,7 @@ def main(args):
                         ref_index.append(i)
             else:
                 start_idx = max(0, f - ref_length * (num_ref // 2))
-                end_idx = min(length, f + ref_length * (num_ref // 2))
+                end_idx = min(length - 1, f + ref_length * (num_ref // 2))
                 for i in range(start_idx, end_idx + 1, ref_length):
                     if i not in neighbor_ids:
                         if len(ref_index) > num_ref:
@@ -104,7 +107,7 @@ def main(args):
             frames = []
             for fr in flist:
                 image = cv2.cvtColor(cv2.imread(fr), cv2.COLOR_BGR2RGB)
-                frames.append(image)
+                frames.append(Image.fromarray(image))
             return frames
 
         # E2FGVI model checkpoint
@@ -121,6 +124,7 @@ def main(args):
         
         frames = read_frame(ilist)
         imgs = to_tensors()(frames).unsqueeze(0) * 2 - 1
+        frames = [np.array(f) for f in frames]
         masks = read_mask(mlist)
         binary_masks = [ # 0 or 1
             np.expand_dims(np.array(m) // 255, -1) for m in masks
@@ -131,10 +135,6 @@ def main(args):
         h,w = frames[0].shape[:2]
         video_length = len(frames)
         comp_frames = [None] * video_length
-        
-        max_refs = 17       # if you encounters out-of-memory errors, use lower 'max_refs' value.
-                            # this value depends on gpu memory size.
-                            # In our experiment with NVIDIA RTX 3060 12GB, we use max_refs = 17
 
         for f in tqdm(range(0, video_length, neighbor_stride)):
             neighbor_ids = [
@@ -143,11 +143,11 @@ def main(args):
             ]
             ref_ids = get_ref_index(f, neighbor_ids, video_length)
             
-            for _ in range(max(0,len(ref_ids)+len(neighbor_ids) - max_refs)):
-                if abs(f-ref_ids[0]) < abs(f-ref_ids[-1]):
-                    ref_ids.pop()
-                else:
-                    ref_ids.pop(0)
+            # for _ in range(max(0,len(ref_ids)+len(neighbor_ids) - max_refs)):
+            #     if abs(f-ref_ids[0]) < abs(f-ref_ids[-1]):
+            #         ref_ids.pop()
+            #     else:
+            #         ref_ids.pop(0)
 
             selected_imgs = imgs[:1, neighbor_ids + ref_ids, :, :, :]
             selected_masks = masks[:1, neighbor_ids + ref_ids, :, :, :]

@@ -1,15 +1,12 @@
 import cv2
 import argparse
 import numpy as np
-import matplotlib.pyplot as plt
-
-from image_similarity_measures.quality_metrics import rmse
 
 parser = argparse.ArgumentParser(description='Object Relocation')
 # ----------------------------------
 parser.add_argument('src', type=str, help='single image or directory')
 parser.add_argument('--dstdir', default='result', help='result save dir')
-parser.add_argument('--mode', choices=[0,1,2], type=int, required=True, help='relocation mode')
+parser.add_argument('--mode', default=2, choices=[0,1,2], type=int, help='relocation mode')
 # ----------------------------------
 args = parser.parse_args()
 
@@ -30,7 +27,6 @@ class Relocator:
             self.n_augframes = 4
     def relocate(self,bimg,img,objects):
         newimg = bimg.copy()
-        
         if self.mode == 0:
             for coor in objects['coor']:
                 for i,j in coor:
@@ -40,8 +36,8 @@ class Relocator:
                 for i,j in coor:
                     newimg[i][j+self.offset] = img[i][j]
         elif self.mode == 2:
-            bbox = objects['box']
-            for bbox, coor in objects.items():
+            for k in range(len(objects['box'])):
+                bbox,coor = objects['box'][k],objects['coor'][k]
                 if bbox[0] < self.l_line:
                     dj = 0
                 elif bbox[2] > self.r_line:
@@ -54,6 +50,7 @@ class Relocator:
         return newimg
 
 # deprecated
+# from image_similarity_measures.quality_metrics import rmse
 # class Relocator:
 #     def __init__(self,args):
 #         self.w = args.w
