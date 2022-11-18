@@ -91,11 +91,9 @@ if os.path.isdir(args.src):
     img_list.sort()
     args.ext = os.path.basename(img_list[0]).split('.')[-1]
     
-    tempimg = Image.open(img_list[0])
-    w,h = tempimg.size
-    # tempimg = cv2.imread(img_list[0],cv2.IMREAD_COLOR)
-    # args.h,args.w,_ = tempimg.shape
-    args.size = w*h
+    tempimg = cv2.imread(img_list[0])
+    h,w,_ = tempimg.shape
+    args.size = h*w
 
     for imgpath in tqdm(img_list):
         args.imgpath = imgpath
