@@ -36,7 +36,7 @@ pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --e
 
 **Step 3.** Install dependencies and Prepare Pretrained Models
 
-[mmdetection](https://github.com/open-mmlab/mmdetection/blob/master/docs/en/get_started.md/#installation) following the pipeline to install
+1. Instance Segmentation [mmdetection](https://github.com/open-mmlab/mmdetection/blob/master/docs/en/get_started.md/#installation) following the pipeline to install
 ```bash
 pip install -U openmim
 mim install mmcv-full
@@ -47,8 +47,8 @@ mkdir checkpoints
 pip install -v -e .
 ```
 Download [mask2former swin-s backbone model checkpoint](https://github.com/open-mmlab/mmdetection/blob/master/docs/en/get_started.md/#installation) at mmdetection/checkpoints/
-
-[E2FGVI-HQ](https://github.com/MCG-NKU/E2FGVI)
+  
+2. Video Inpainting [E2FGVI-HQ](https://github.com/MCG-NKU/E2FGVI)
 ```bash
 git clone https://github.com/MCG-NKU/E2FGVI.git
 ```
@@ -60,8 +60,9 @@ git clone https://github.com/hyunobae/AOT-GAN-for-Inpainting.git
 ```
 
 ## Quick Use
+End-to-End Use
 ```
-
+bash en2end.sh
 ```
   
 ### CUDA Version, cuDNN Version Check  
